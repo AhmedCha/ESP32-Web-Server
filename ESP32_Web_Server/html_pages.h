@@ -117,6 +117,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <button class="btn" onclick="toggleLED(2)">Toggle</button>
     </div>
   </div>
+  <hr style="margin-top: 30px;">
   <h1>Capteurs</h1>
   <div class="container">
     <div class="card">
