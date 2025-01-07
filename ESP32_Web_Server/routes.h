@@ -12,21 +12,12 @@
 std::map<IPAddress, String> userRoles;
 std::map<IPAddress, bool> loggedInUsers;
 std::map<IPAddress, time_t> loginTimestamps;
-#include <map>
-#include <IPAddress.h>
-#include <ctime>
-
-std::map<IPAddress, String> userRoles;
-std::map<IPAddress, bool> loggedInUsers;
-std::map<IPAddress, time_t> loginTimestamps;
 
 // External variables
 extern Preferences preferences;
 extern AsyncWebServer server;
 extern String currentSSID;
 extern String currentWiFiPassword;
-extern String currentAPSSID;
-extern String currentAPPassword;
 extern String currentAPSSID;
 extern String currentAPPassword;
 extern String currentUsername;
@@ -64,34 +55,7 @@ bool isSessionValid(IPAddress clientIP) {
   return false;  // No session found
 }
 
-// Helper Function: Check if the client is logged in
-bool isSessionValid(IPAddress clientIP) {
-  if (loginTimestamps.find(clientIP) != loginTimestamps.end()) {
-    time_t currentTime = time(nullptr);
-    time_t loginTime = loginTimestamps[clientIP];
-
-    if (difftime(currentTime, loginTime) > 300) {  // Session expired
-      loginTimestamps.erase(clientIP);
-      userRoles.erase(clientIP);
-      return false;
-    }
-    return true;
-  }
-  return false;  // No session found
-}
-
 bool ensureLoggedIn(AsyncWebServerRequest *request) {
-  // Get the client's IP address
-  IPAddress clientIP = request->client()->remoteIP();
-
-  if (!loggedInUsers[clientIP]) {
-    request->redirect("/login");
-    return false;
-  }
-
-  // Validate the session
-  if (!isSessionValid(clientIP)) {
-    loggedInUsers[clientIP] = false;
   // Get the client's IP address
   IPAddress clientIP = request->client()->remoteIP();
 
@@ -149,68 +113,6 @@ void handleLED(AsyncWebServerRequest *request) {
   html.replace("LED2_STATE", led2State ? "ON" : "OFF");
 
   request->send(200, "text/html", html);
-}
-
-// Login Page Handler
-void sendLoginHtml(AsyncWebServerRequest *request, const char *message = nullptr) {
-  String html = FPSTR(LOGIN_HTML);
-  html.replace("%MESSAGE%", message ? message : "");
-  request->send(200, "text/html", html);
-}
-
-// Login Handler
-void handleLogin(AsyncWebServerRequest *request) {
-  IPAddress clientIP = request->client()->remoteIP();
-  if (isSessionValid(clientIP)) {
-    request->redirect(userRoles[clientIP] == "admin" ? "/settings" : "/");
-    return;
-  }
-
-  if (request->method() == HTTP_POST) {
-    String username = request->getParam("username", true)->value();
-    String password = request->getParam("password", true)->value();
-
-    if (username == currentUsername && password == currentPassword) {
-      loggedInUsers[clientIP] = true;
-
-      // Get the client's IP address
-      IPAddress clientIP = request->client()->remoteIP();
-
-      // Store the login timestamp
-      loginTimestamps[clientIP] = time(nullptr);
-
-      // Determine role based on client IP
-      String role;
-      if (clientIP[0] == 192 && clientIP[1] == 168 && clientIP[2] == 4) {
-        role = "admin";  // AP user
-        request->redirect("/settings");
-      } else {
-        role = "viewer";  // STA user
-        request->redirect("/");
-      }
-
-      // Store the user's role in the map
-      userRoles[clientIP] = role;
-
-      return;
-    }
-
-    sendLoginHtml(request, "Invalid credentials. Please try again.");
-  } else {
-    sendLoginHtml(request);
-  }
-}
-
-
-// Logout Handler
-void handleLogout(AsyncWebServerRequest *request) {
-  IPAddress clientIP = request->client()->remoteIP();
-
-  // Remove the user's login state and role
-  loggedInUsers.erase(clientIP);
-  userRoles.erase(clientIP);
-
-  request->redirect("/login");
 }
 
 // Login Page Handler
@@ -354,7 +256,6 @@ void handleUpdateSettings(AsyncWebServerRequest *request) {
     preferences.begin("settings", false);
 
     // Wifi SSID and password
-    // Wifi SSID and password
     if (request->hasParam("ssid", true) && request->hasParam("wifi_password", true)) {
       currentSSID = request->getParam("ssid", true)->value();
       currentWiFiPassword = request->getParam("wifi_password", true)->value();
@@ -421,7 +322,6 @@ void handleUpdateSettings(AsyncWebServerRequest *request) {
         preferences.putString("username", currentUsername);
         isUpdated = true;
         handleLogout(request);
-        handleLogout(request);
         Serial.println("Username updated, user logged out.");
       }
     }
@@ -432,7 +332,6 @@ void handleUpdateSettings(AsyncWebServerRequest *request) {
         currentPassword = newPassword;
         preferences.putString("password", currentPassword);
         isUpdated = true;
-        handleLogout(request);
         handleLogout(request);
         Serial.println("Password updated, user logged out.");
       }
@@ -491,37 +390,7 @@ bool ensureLoggedInAndAuthorized(AsyncWebServerRequest *request, String required
 }
 
 
-bool ensureLoggedInAndAuthorized(AsyncWebServerRequest *request, String requiredRole) {
-  IPAddress clientIP = request->client()->remoteIP();
-  if (!isSessionValid(clientIP)) {
-    request->redirect("/login");
-    return false;
-  }
-
-  if (userRoles[clientIP] != requiredRole && !requiredRole.isEmpty()) {
-    request->redirect("/");
-    return false;
-  }
-
-  return true;
-}
-
-
 void setupLEDRoutes() {
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!ensureLoggedInAndAuthorized(request, "")) return;
-    handleLED(request);
-  });
-
-  server.on("/toggle_led", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!ensureLoggedInAndAuthorized(request, "")) return;
-    handleToggleLED(request);
-  });
-
-  server.on("/set_led_intensity", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!ensureLoggedInAndAuthorized(request, "")) return;
-    handleSetLEDIntensity(request);
-  });
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (!ensureLoggedInAndAuthorized(request, "")) return;
     handleLED(request);
@@ -543,26 +412,10 @@ void setupSensorRoutes() {
     if (!ensureLoggedInAndAuthorized(request, "")) return;
     handleSensorData(request);
   });
-  server.on("/sensor_data", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!ensureLoggedInAndAuthorized(request, "")) return;
-    handleSensorData(request);
-  });
 }
-
 
 
 void setupSettingsRoutes() {
-  server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!ensureLoggedInAndAuthorized(request, "admin")) return;
-    handleSettings(request);  // Call the actual settings handler
-  });
-
-  server.on("/update_settings", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (!ensureLoggedInAndAuthorized(request, "admin")) return;
-    handleUpdateSettings(request);  // Handle settings update
-  });
-}
-
   server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (!ensureLoggedInAndAuthorized(request, "admin")) return;
     handleSettings(request);  // Call the actual settings handler
@@ -578,12 +431,9 @@ void setupSettingsRoutes() {
 // Main Setup Function for All Routes
 void setupRoutes() {
   // Authentication Routes
-  // Authentication Routes
   setupAuthRoutes();
   // LED and Dashboard Routes
-  // LED and Dashboard Routes
   setupLEDRoutes();
-  // Settings Routes (with access control)
   // Settings Routes (with access control)
   setupSettingsRoutes();
   // Sensor Data Routes
