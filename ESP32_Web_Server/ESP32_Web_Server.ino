@@ -4,11 +4,14 @@
 #include <Preferences.h>
 
 
+
 // Global Variables
 Preferences preferences;
 AsyncWebServer server(80);
 String currentSSID = "bardo";
 String currentWiFiPassword = "12345679";
+String currentAPSSID = "ESP32_001";
+String currentAPPassword = "men0lel1";
 String currentAPSSID = "ESP32_001";
 String currentAPPassword = "men0lel1";
 String currentUsername = "admin";
@@ -27,6 +30,8 @@ void setup() {
   currentWiFiPassword = preferences.getString("wifi_password", "12345679");
   currentAPSSID = preferences.getString("apssid", "ESP32_001");
   currentAPPassword = preferences.getString("ap_password", "men0lel1");
+  currentAPSSID = preferences.getString("apssid", "ESP32_001");
+  currentAPPassword = preferences.getString("ap_password", "men0lel1");
   currentUsername = preferences.getString("username", "admin");
   currentPassword = preferences.getString("password", "password");
   preferences.end();
@@ -37,6 +42,8 @@ void setup() {
   digitalWrite(LED1_PIN, LOW);
   digitalWrite(LED2_PIN, LOW);
   dht.begin();
+
+  WiFi.mode(WIFI_AP_STA);
 
   WiFi.mode(WIFI_AP_STA);
 
@@ -61,11 +68,21 @@ void setup() {
   Serial.print("AP IP Address: ");
   Serial.println(WiFi.softAPIP());
 
+  // Configure Access Point
+  WiFi.softAP(currentAPSSID.c_str(), currentAPPassword.c_str());
+  Serial.print("AP IP Address: ");
+  Serial.println(WiFi.softAPIP());
+
   // Set up routes and start the server
   setupRoutes();
   server.begin();
   Serial.println("HTTP server started");
 
+  // Log credentials
+  Serial.print("Username: \n>");
+  Serial.println(currentUsername);
+  Serial.print("Password: \n>");
+  Serial.println(currentPassword);
   // Login credentials
   Serial.println();
   Serial.print("Username: ");
@@ -82,6 +99,8 @@ void setup() {
 }
 
 void loop() {
+  cleanupExpiredSessions();
+  delay(1000);
   unsigned long currentTime = millis();
   if (currentTime - lastScanTime >= SCAN_INTERVAL_MS) {
     lastScanTime = currentTime;
