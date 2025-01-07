@@ -22,7 +22,7 @@ extern String currentAPSSID;
 extern String currentAPPassword;
 extern String currentUsername;
 extern String currentPassword;
-String userRole = "";
+extern String wifiOptionsHTML;
 
 // Pin definitions
 #define LED1_PIN 26
@@ -71,11 +71,8 @@ bool ensureLoggedIn(AsyncWebServerRequest *request) {
     return false;
   }
 
-  // Get the role of the current user
-  String userRole = userRoles[clientIP];
-
   // Restrict access to settings for non-admin users
-  if (userRole != "admin" && request->url().startsWith("/settings")) {
+  if (userRoles[clientIP] != "admin" && request->url().startsWith("/settings")) {
     request->redirect("/");  // Redirect non-admin users to the dashboard
     Serial.println("Redirected, not logged in!!");
     return false;
@@ -87,6 +84,23 @@ bool ensureLoggedIn(AsyncWebServerRequest *request) {
 void toggleLED(int pin, bool &state) {
   state = !state;
   digitalWrite(pin, state ? HIGH : LOW);
+}
+
+// Scan available wifi SSID
+void scanForWiFiNetworks() {
+  String options = "";
+  int n = WiFi.scanNetworks();  // Perform Wi-Fi scan
+  if (n == 0) {
+    options = "<option value='Null'>No Networks Found</option>";
+  } else {
+    for (int i = 0; i < n; i++) {
+      options += "<option value='" + WiFi.SSID(i) + "'>";
+      options += WiFi.SSID(i) + " (" + String(WiFi.RSSI(i)) + "dB)";
+      options += "</option>";
+    }
+  }
+  wifiOptionsHTML = options;
+  WiFi.scanDelete();
 }
 
 // Route Handlers
@@ -224,6 +238,7 @@ void handleSettings(AsyncWebServerRequest *request) {
   if (!ensureLoggedIn(request)) return;
 
   String html = FPSTR(SETTINGS_HTML);
+  html.replace("%WIFI_OPTIONS%", wifiOptionsHTML);
   html.replace("CURRENT_SSID", currentSSID);
   html.replace("CURRENT_USERNAME", currentUsername);
   request->send(200, "text/html", html);
@@ -232,13 +247,10 @@ void handleSettings(AsyncWebServerRequest *request) {
 // Update Settings Handler
 void handleUpdateSettings(AsyncWebServerRequest *request) {
   bool isUpdated = false;
+  IPAddress clientIP = request->client()->remoteIP();
 
   if (!ensureLoggedIn(request)) return;
-
-  if (WiFi.getMode() != WIFI_AP) {
-    request->send(403, "text/plain", "Settings updates are not allowed in STA mode.");
-    return;
-  }
+  if (userRoles[clientIP] != "admin") return;
 
   if (request->method() == HTTP_POST) {
     preferences.begin("settings", false);
@@ -271,6 +283,34 @@ void handleUpdateSettings(AsyncWebServerRequest *request) {
         } else {
           Serial.println("Failed to connect to Wi-Fi.");
         }
+      }
+    }
+
+    // AP SSID and password
+    if (request->hasParam("apssid", true) && request->hasParam("ap_password", true)) {
+      String newAPSSID = request->getParam("apssid", true)->value();
+      String newAPPassword = request->getParam("ap_password", true)->value();
+
+      if (newAPSSID.length() > 0 && newAPPassword.length() >= 8) {  // Password length should be at least 8 characters
+        preferences.putString("apssid", newAPSSID);
+        preferences.putString("ap_password", newAPPassword);
+        isUpdated = true;
+
+        Serial.println("Updating Access Point settings...");
+
+        WiFi.softAPdisconnect(true);  // Disconnect any existing AP
+        bool apStarted = WiFi.softAP(newAPSSID.c_str(), newAPPassword.c_str());
+
+        if (apStarted) {
+          Serial.print("New AP SSID: ");
+          Serial.println(newAPSSID);
+          Serial.print("AP Password: ");
+          Serial.println(newAPPassword);
+        } else {
+          Serial.println("Failed to start Access Point.");
+        }
+      } else {
+        Serial.println("Invalid AP SSID or Password.");
       }
     }
 
@@ -309,9 +349,6 @@ void handleUpdateSettings(AsyncWebServerRequest *request) {
     request->send(405, "text/plain", "Method Not Allowed");
   }
 }
-
-
-
 
 
 void cleanupExpiredSessions() {
@@ -401,63 +438,6 @@ void setupRoutes() {
   setupSettingsRoutes();
   // Sensor Data Routes
   setupSensorRoutes();
-}
-
-// Initialization Function
-void initializeSystem() {
-  // Initialize LED pins
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-
-  // Initialize DHT sensor
-  dht.begin();
-
-  // Load stored preferences
-  preferences.begin("settings", true);
-  currentSSID = preferences.getString("ssid", "");
-  currentWiFiPassword = preferences.getString("wifi_password", "");
-  currentAPSSID = preferences.getString("apssid", "ESP32_001");
-  currentAPPassword = preferences.getString("ap_password", "men0lel1");
-  currentUsername = preferences.getString("username", "admin");
-  currentPassword = preferences.getString("password", "admin");
-  preferences.end();
-
-  // Configure Wi-Fi in Station + AP mode
-  WiFi.mode(WIFI_AP_STA);
-
-  // Connect to Wi-Fi if credentials are available
-  if (!currentSSID.isEmpty() && !currentWiFiPassword.isEmpty()) {
-    Serial.print("Connecting to Wi-Fi: ");
-    Serial.println(currentSSID);
-    WiFi.begin(currentSSID.c_str(), currentWiFiPassword.c_str());
-
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < WIFI_ATTEMPTS) {
-      delay(WIFI_DELAY_MS);
-      Serial.print(".");
-      attempts++;
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\nWi-Fi connected");
-      Serial.print("IP Address: ");
-      Serial.println(WiFi.localIP());
-    } else {
-      Serial.println("\nFailed to connect to Wi-Fi");
-    }
-  } else {
-    Serial.println("No Wi-Fi credentials stored.");
-  }
-
-  // Start Access Point Mode
-  WiFi.softAP(currentAPSSID.c_str(), currentAPPassword.c_str());  // Configure SSID and password
-  Serial.print("AP IP Address: ");
-  Serial.println(WiFi.softAPIP());
-
-  // Start the server
-  setupRoutes();
-  server.begin();
-  Serial.println("Server started");
 }
 
 #endif  // ROUTES_H

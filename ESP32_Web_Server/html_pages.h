@@ -299,7 +299,7 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       text-align: center;
     }
 
-    h1 {
+    h2 {
       color: #ff8801;
       text-align: center;
     }
@@ -308,6 +308,8 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       display: block;
       margin-bottom: 5px;
       font-weight: bold;
+      text-align: start;
+      margin-left: 30px;
     }
 
     input {
@@ -331,6 +333,7 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       background: #ff8801;
       color: white;
       padding: 10px;
+      margin-bottom: 10px;
       border: none;
       border-radius: 5px;
       cursor: pointer;
@@ -340,6 +343,20 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
 
     button:hover {
       background-color: #ffa43d;
+    }
+
+    hr {
+      margin: 30px 0px;
+    }
+
+    select {
+      width: 85%;
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 0px;
+      border-bottom: 1px solid;
+      font-size: 1em;
+      background-color: #fff;
     }
   </style>
 </head>
@@ -354,7 +371,7 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
     </div>
   </div>
   <div class="container">
-    <h1>Change Settings</h1>
+    <h2>Login Settings</h2>
     <form action="/update_settings" method="POST">
       <label for="username">Username:</label>
       <input type="text" id="username" name="username" placeholder="Username">
@@ -362,11 +379,27 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       <label for="password">Password:</label>
       <input type="password" id="password" name="password" placeholder="Password">
 
+      <hr>
+      <h2>Wifi Settings</h2>
+
       <label for="ssid">WiFi SSID:</label>
-      <input type="text" id="ssid" name="ssid" placeholder="SSID">
+
+      <select type="text" id="ssid" name="ssid" default="Null">
+        <option value="Null">--- Chouse Wifi  ---</option>
+        %WIFI_OPTIONS%
+      </select>
 
       <label for="wifi_password">WiFi Password:</label>
       <input type="password" id="wifi_password" name="wifi_password" placeholder="Password">
+
+      <hr>
+      <h2>Access Point Settings</h2>
+
+      <label for="apssid">Access Point SSID:</label>
+      <input type="text" id="apssid" name="apssid" placeholder="SSID">
+
+      <label for="ap_password">Access Point Password:</label>
+      <input type="password" id="ap_password" name="ap_password" placeholder="Password">
 
       <button type="submit">Update</button>
     </form>

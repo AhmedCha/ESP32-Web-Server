@@ -13,6 +13,10 @@ String currentAPSSID = "ESP32_001";
 String currentAPPassword = "men0lel1";
 String currentUsername = "admin";
 String currentPassword = "password";
+String wifiOptionsHTML = "";
+
+unsigned long lastScanTime = 0;                // Tracks the last scan time
+const unsigned long SCAN_INTERVAL_MS = 10000;  // Time between scans (10 seconds)
 
 void setup() {
   Serial.begin(115200);
@@ -62,14 +66,27 @@ void setup() {
   server.begin();
   Serial.println("HTTP server started");
 
-  // Log credentials
-  Serial.print("Username: \n>");
+  // Login credentials
+  Serial.println();
+  Serial.print("Username: ");
   Serial.println(currentUsername);
-  Serial.print("Password: \n>");
+  Serial.print("Password: ");
   Serial.println(currentPassword);
+
+  // Access point credentials
+  Serial.println();
+  Serial.print("Access point: ");
+  Serial.println(currentAPSSID);
+  Serial.print("AP Password: ");
+  Serial.println(currentAPPassword);
 }
 
 void loop() {
-  cleanupExpiredSessions();
-  delay(1000);
+  unsigned long currentTime = millis();
+  if (currentTime - lastScanTime >= SCAN_INTERVAL_MS) {
+    lastScanTime = currentTime;
+    scanForWiFiNetworks();
+    cleanupExpiredSessions();
+  }
+  delay(10);
 }
