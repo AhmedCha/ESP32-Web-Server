@@ -57,7 +57,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     .card {
       background: white;
-      padding: 20px;
+      padding: 10px 20px;
       border-radius: 8px;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
       text-align: center;
@@ -104,20 +104,26 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <a href="/logout">Logout</a>
     </div>
   </div>
+
   <h1>Controle de LEDs</h1>
   <div class="container">
     <div class="card">
-      <p>LED 1</p>
+      <h2>LED 1</h2>
       <input class="sld" type="range" id="led1-slider" min="0" max="255" value="0"
         oninput="updateLEDIntensity(1, this.value)">
       <p>Intensity: <span id="led1-intensity">0</span></p>
     </div>
+
     <div class="card">
-      <p>LED 2</p>
+      <h2>LED 2</h2>
+      <div id="led2Icon"></div>
+      <br>
       <button class="btn" onclick="toggleLED(2)">Toggle</button>
     </div>
   </div>
+
   <hr style="margin-top: 30px;">
+  
   <h1>Capteurs</h1>
   <div class="container">
     <div class="card">
@@ -127,9 +133,39 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     </div>
   </div>
   <script>
-    function toggleLED(led) {
-      fetch(`/toggle_led?led=${led}`);
+
+
+  function updateLEDIcons() {
+      fetch('/led-state')
+        .then(response => response.json())
+        .then(data => {
+          // Update LED 1 Icon
+          //document.getElementById('led1Icon').innerHTML = data.led1State
+            
+          // Update LED 2 Icon
+          document.getElementById('led2Icon').innerHTML = data.led2State        
+        });
     }
+
+    function toggleLED(led) {
+      fetch(`/toggle?led=${led}`)
+        .then(() => updateLEDIcons());
+    }
+
+    // Call this function once when the page loads to set the initial state
+    function setInitialState() {
+      fetch('/led-state')
+        .then(response => response.json())
+        .then(data => {
+          // Set the initial SVG based on the state received
+          //document.getElementById("led1Icon").innerHTML = data.led1State;
+          document.getElementById("led2Icon").innerHTML = data.led2State;
+        });
+    }
+
+    // Initialize the page state on load
+    setInitialState();
+
 
     function updateSensorData() {
       fetch("/sensor_data")
